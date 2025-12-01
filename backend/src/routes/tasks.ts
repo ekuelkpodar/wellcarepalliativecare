@@ -13,7 +13,7 @@ router.get('/', (req: AuthedRequest, res) => {
   res.json(result);
 });
 
-router.post('/', requireRole(['NURSE', 'PHYSICIAN', 'SOCIAL_WORKER', 'CHAPLAIN', 'COORDINATOR', 'ADMIN']), (req: AuthedRequest, res) => {
+router.post('/', requireRole(['NURSE', 'PHYSICIAN', 'SOCIAL_WORKER', 'CHAPLAIN', 'COORDINATOR', 'ADMIN', 'CARE_PROVIDER']), (req: AuthedRequest, res) => {
   const { patientId, episodeId, assignedTo, category, title, description, priority, dueAt } = req.body ?? {};
   if (!patientId || !title) return res.status(400).json({ error: 'patientId and title are required' });
 

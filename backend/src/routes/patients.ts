@@ -36,7 +36,7 @@ router.get('/:id', (req: AuthedRequest, res) => {
   res.json({ ...bundle, riskScore: risk.composite });
 });
 
-router.post('/:id/symptoms', requireRole(['PATIENT', 'CAREGIVER', 'NURSE', 'PHYSICIAN', 'SOCIAL_WORKER']), (req: AuthedRequest, res) => {
+router.post('/:id/symptoms', requireRole(['PATIENT', 'CAREGIVER', 'NURSE', 'PHYSICIAN', 'SOCIAL_WORKER', 'CARE_PROVIDER']), (req: AuthedRequest, res) => {
   const { pain, dyspnea, fatigue, notes } = req.body ?? {};
   const patientId = req.params.id;
   if (!store.patients.find((p) => p.id === patientId)) return res.status(404).json({ error: 'Patient not found' });

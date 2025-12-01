@@ -1,41 +1,28 @@
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
-const headers = {
-  'Content-Type': 'application/json',
-  'x-user-role': 'COORDINATOR'
-};
+const baseHeaders = { 'Content-Type': 'application/json' };
+
+export type Role = 'PATIENT' | 'CARE_PROVIDER' | 'COORDINATOR';
+
+export interface AuthPayload {
+  token: string;
+  user: { id: string; fullName: string; email: string; role: Role };
+}
 
 export const api = {
-  async listPatients() {
-    const res = await fetch(`${API_BASE}/api/patients`, { headers });
+  async signup(data: { fullName: string; email: string; password: string; confirmPassword: string; role: Role }): Promise<AuthPayload> {
+    const res = await fetch(`${API_BASE}/api/auth/signup`, { method: 'POST', headers: baseHeaders, body: JSON.stringify(data) });
+    if (!res.ok) throw new Error((await res.json()).error ?? 'Signup failed');
     return res.json();
   },
-  async getPatient(id: string) {
-    const res = await fetch(`${API_BASE}/api/patients/${id}`, { headers });
+  async login(data: { email: string; password: string }): Promise<AuthPayload> {
+    const res = await fetch(`${API_BASE}/api/auth/login`, { method: 'POST', headers: baseHeaders, body: JSON.stringify(data) });
+    if (!res.ok) throw new Error((await res.json()).error ?? 'Login failed');
     return res.json();
   },
-  async listIntake() {
-    const res = await fetch(`${API_BASE}/api/intake`, { headers });
-    return res.json();
-  },
-  async listSchedule() {
-    const res = await fetch(`${API_BASE}/api/schedule`, { headers });
-    return res.json();
-  },
-  async listTasks() {
-    const res = await fetch(`${API_BASE}/api/tasks`, { headers });
-    return res.json();
-  },
-  async analytics() {
-    const res = await fetch(`${API_BASE}/api/analytics`, { headers });
-    return res.json();
-  },
-  async rounds() {
-    const res = await fetch(`${API_BASE}/api/rounds`, { headers });
-    return res.json();
-  },
-  async portal(patientId: string) {
-    const res = await fetch(`${API_BASE}/api/portal/${patientId}`, { headers });
+  async me(token: string) {
+    const res = await fetch(`${API_BASE}/api/auth/me`, { headers: { ...baseHeaders, Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error('Unauthorized');
     return res.json();
   }
 };

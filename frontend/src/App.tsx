@@ -1,438 +1,418 @@
-import { useEffect, useMemo, useState } from 'react';
-import { api } from './api';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { api, type Role } from './api';
 import './App.css';
 
-type Patient = {
-  id: string;
-  name: string;
-  primaryDiagnosis: string;
-  codeStatus: string;
-  riskScore: number;
-  primaryLanguage?: string;
-  livingSituation?: string;
-  carePreferences?: string;
-  goalsOfCare?: string;
-  openTasks?: number;
-  latestSymptom?: { pain?: number; dyspnea?: number; fatigue?: number };
+type Mode = 'landing' | 'login' | 'signup' | 'dashboard';
+
+interface AuthState {
+  token: string;
+  user: { id: string; fullName: string; email: string; role: Role };
+}
+
+const roleCopy: Record<Role, { title: string; blurb: string; accent: string }> = {
+  PATIENT: { title: 'Patient & Family', blurb: 'See your plan, your team, and what to expect next.', accent: '#0ea5e9' },
+  CARE_PROVIDER: { title: 'Care Provider', blurb: 'Unified view of patients, symptoms, and tasks.', accent: '#10b981' },
+  COORDINATOR: { title: 'Coordinator', blurb: 'Manage referrals, schedules, and assignments.', accent: '#a855f7' }
 };
 
-type PatientBundle = {
-  patient: any;
-  episodes: any[];
-  medications: any[];
-  vitals: any[];
-  symptomLogs: any[];
-  functionalStatuses: any[];
-  tasks: any[];
-  encounters: any[];
-  equipment: any[];
-  transportationEvents: any[];
-  utilizations: any[];
-  communications: any[];
-  documents: any[];
-  teams: any[];
-  careTeamMembers: any[];
-  riskScore: number;
-};
-
-type IntakeReferral = {
-  id: string;
-  patientName: string;
-  primaryDiagnosis: string;
-  urgency: string;
-  reason: string;
-  status: string;
-  createdAt: string;
-};
-
-const Chip = ({ label, tone = 'neutral' }: { label: string; tone?: 'neutral' | 'alert' | 'ok' | 'warm' }) => (
-  <span className={`chip chip-${tone}`}>{label}</span>
+const RolePill = ({ role, selected, onClick }: { role: Role; selected: boolean; onClick: () => void }) => (
+  <button className={`pill ${selected ? 'pill-active' : ''}`} style={{ borderColor: roleCopy[role].accent }} onClick={onClick}>
+    {roleCopy[role].title}
+  </button>
 );
 
 function App() {
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [selectedPatientId, setSelectedPatientId] = useState<string>();
-  const [patientBundle, setPatientBundle] = useState<PatientBundle | null>(null);
-  const [intake, setIntake] = useState<IntakeReferral[]>([]);
-  const [schedule, setSchedule] = useState<any[]>([]);
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [analytics, setAnalytics] = useState<any>();
-  const [rounds, setRounds] = useState<any[]>([]);
-  const [portal, setPortal] = useState<any>();
+  const [mode, setMode] = useState<Mode>('landing');
+  const [auth, setAuth] = useState<AuthState | null>(null);
+  const [role, setRole] = useState<Role>('PATIENT');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const load = async () => {
-      const [pList, intakeData, scheduleData, taskData, analyticsData, roundsData] = await Promise.all([
-        api.listPatients(),
-        api.listIntake(),
-        api.listSchedule(),
-        api.listTasks(),
-        api.analytics(),
-        api.rounds()
-      ]);
-      setPatients(pList);
-      setIntake(intakeData);
-      setSchedule(scheduleData);
-      setTasks(taskData);
-      setAnalytics(analyticsData);
-      setRounds(roundsData);
-      setSelectedPatientId(pList[0]?.id);
-    };
-    load();
+    const token = localStorage.getItem('sc_token');
+    const user = localStorage.getItem('sc_user');
+    if (token && user) {
+      setAuth({ token, user: JSON.parse(user) });
+      setMode('dashboard');
+    }
   }, []);
 
-  useEffect(() => {
-    const loadDetail = async () => {
-      if (!selectedPatientId) return;
-      const detail = await api.getPatient(selectedPatientId);
-      setPatientBundle(detail);
-      const portalData = await api.portal(selectedPatientId);
-      setPortal(portalData);
-    };
-    loadDetail();
-  }, [selectedPatientId]);
-
-  const riskLabel = (risk?: number) => {
-    if (risk === undefined) return 'unknown';
-    if (risk >= 8) return 'high';
-    if (risk >= 5) return 'moderate';
-    return 'stable';
+  const resetForms = () => {
+    setFullName('');
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    setError(null);
   };
 
-  const todaysWork = useMemo(() => {
-    const upcomingVisits = schedule.filter((enc) => enc);
-    const urgentTasks = tasks.filter((t) => t.priority === 'urgent' || t.priority === 'high');
-    return { upcomingVisits, urgentTasks };
-  }, [schedule, tasks]);
+  const handleSignup = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await api.signup({ fullName, email, password, confirmPassword, role });
+      localStorage.setItem('sc_token', result.token);
+      localStorage.setItem('sc_user', JSON.stringify(result.user));
+      setAuth(result);
+      setMode('dashboard');
+      resetForms();
+    } catch (err: any) {
+      setError(err.message ?? 'Signup failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await api.login({ email, password });
+      localStorage.setItem('sc_token', result.token);
+      localStorage.setItem('sc_user', JSON.stringify(result.user));
+      setAuth(result);
+      setMode('dashboard');
+      resetForms();
+    } catch (err: any) {
+      setError(err.message ?? 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('sc_token');
+    localStorage.removeItem('sc_user');
+    setAuth(null);
+    setMode('landing');
+  };
+
+  const dashboardCard = useMemo(() => {
+    if (!auth) return null;
+    const greeting = `Welcome, ${auth.user.fullName}`;
+    if (auth.user.role === 'PATIENT') {
+      return { title: greeting, lines: ['Upcoming visits and reminders will appear here.', 'Meet your care team and keep your goals visible.'] };
+    }
+    if (auth.user.role === 'CARE_PROVIDER') {
+      return {
+        title: greeting,
+        lines: ['View your patient panel in one place.', 'Prep for visits with symptom, function, and task snapshots.']
+      };
+    }
+    return { title: greeting, lines: ['Track referrals and assign visits.', 'Balance caseloads and reduce missed appointments.'] };
+  }, [auth]);
 
   return (
     <div className="page">
-      <header className="hero">
-        <div>
-          <p className="eyebrow">Palliative Care 360° Platform</p>
-          <h1>Unified patient, team, and operations console</h1>
-          <p className="lede">
-            Clinical, psychosocial, spiritual, and logistics data in one view — built for IDT collaboration and safe,
-            proactive care.
-          </p>
-          <div className="hero-chips">
-            <Chip label="Patient 360" />
-            <Chip label="IDT Rounds" />
-            <Chip label="Patient / Caregiver Portal" />
-          </div>
-        </div>
-        <div className="hero-card">
-          <h3>My Work Today</h3>
-          <div className="stat">
-            <div>
-              <p className="stat-label">Urgent tasks</p>
-              <p className="stat-number">{todaysWork.urgentTasks.length}</p>
-            </div>
-            <div>
-              <p className="stat-label">Visits scheduled</p>
-              <p className="stat-number">{todaysWork.upcomingVisits.length}</p>
-            </div>
-          </div>
-          <ul className="mini-list">
-            {todaysWork.urgentTasks.slice(0, 3).map((t) => (
-              <li key={t.id}>
-                <Chip label={t.priority} tone="alert" /> {t.title}
-              </li>
-            ))}
-            {todaysWork.upcomingVisits.slice(0, 2).map((v) => (
-              <li key={v.id}>
-                <Chip label={v.type} tone="warm" /> {v.patientName} · {new Date(v.startTime).toLocaleString()}
-              </li>
-            ))}
-          </ul>
+      <header className="nav">
+        <div className="logo">SerenityCare 360</div>
+        <nav>
+          <a href="#home">Home</a>
+          <a href="#how">How It Works</a>
+          <a href="#patients">For Patients</a>
+          <a href="#providers">For Providers</a>
+          <a href="#coordinators">For Coordinators</a>
+          <a href="#security">Security</a>
+          <a href="#contact">Contact</a>
+        </nav>
+        <div className="nav-actions">
+          <button className="ghost" onClick={() => setMode('login')}>
+            Log In
+          </button>
+          <button className="primary" onClick={() => setMode('signup')}>
+            Get Started
+          </button>
         </div>
       </header>
 
-      <main className="grid">
-        <section className="panel">
-          <header className="panel-header">
-            <div>
-              <p className="eyebrow">Patient census</p>
-              <h2>Patient List</h2>
-            </div>
-            <Chip label={`${patients.length} active`} />
-          </header>
-          <div className="list">
-            {patients.map((p) => (
-              <button
-                key={p.id}
-                className={`list-row ${selectedPatientId === p.id ? 'active' : ''}`}
-                onClick={() => setSelectedPatientId(p.id)}
-              >
-                <div>
-                  <strong>{p.name}</strong>
-                  <p className="muted">
-                    {p.primaryDiagnosis} · Code: {p.codeStatus}
-                  </p>
-                  <div className="row-chips">
-                    <Chip label={`Risk: ${riskLabel(p.riskScore)}`} tone={p.riskScore >= 8 ? 'alert' : p.riskScore >= 5 ? 'warm' : 'ok'} />
-                    <Chip label={`Tasks: ${p.openTasks ?? 0}`} tone="neutral" />
-                  </div>
-                </div>
-                <span className="score">{p.riskScore}</span>
+      <main>
+        <section id="home" className="hero">
+          <div>
+            <p className="eyebrow">Unified Palliative Care Platform</p>
+            <h1>Unified palliative care, centered on what matters most.</h1>
+            <p className="lede">Connect patients, care providers, and coordinators in one secure place for calm, coordinated support.</p>
+            <div className="hero-actions">
+              <button className="primary" onClick={() => setMode('signup')}>
+                Sign Up as Patient
               </button>
-            ))}
+              <button className="secondary" onClick={() => setMode('signup')}>
+                Sign Up as Care Provider
+              </button>
+              <button className="secondary" onClick={() => setMode('signup')}>
+                Sign Up as Coordinator
+              </button>
+            </div>
+            <p className="muted link" onClick={() => setMode('login')}>
+              Already have an account? Log in
+            </p>
+            <div className="trust">
+              <span>Designed for palliative & serious illness teams</span>
+              <span>•</span>
+              <span>HIPAA-conscious architecture</span>
+            </div>
+          </div>
+          <div className="hero-card">
+            <p className="eyebrow">Role-based access</p>
+            <h3>Patients, Providers, Coordinators</h3>
+            <p className="muted">One secure hub for care plans, visits, and communication.</p>
+            <div className="badges">
+              <span>Patient 360°</span>
+              <span>Secure Messaging</span>
+              <span>Visit Scheduling</span>
+            </div>
           </div>
         </section>
 
-        <section className="panel wide">
-          <header className="panel-header">
-            <div>
-              <p className="eyebrow">Patient 360°</p>
-              <h2>{patientBundle?.patient?.name ?? 'Select a patient'}</h2>
+        <section id="how" className="section">
+          <div className="section-header">
+            <p className="eyebrow">How it works</p>
+            <h2>Smoother coordination in three steps</h2>
+          </div>
+          <div className="steps">
+            <div className="card">
+              <span className="step-number">1</span>
+              <h3>Create your account</h3>
+              <p className="muted">Choose your role and set up secure access for your team.</p>
             </div>
-            {patientBundle && <Chip label={`Risk ${riskLabel(patientBundle.riskScore)}`} tone={patientBundle.riskScore >= 8 ? 'alert' : 'warm'} />}
-          </header>
-          {patientBundle && (
-            <div className="patient-grid">
-              <div className="card">
-                <h3>Story & Goals</h3>
-                <p className="muted">{patientBundle.patient.goalsOfCare}</p>
-                <p className="muted">Preferences: {patientBundle.patient.carePreferences}</p>
-                <div className="chips">
-                  <Chip label={`Code: ${patientBundle.patient.codeStatus}`} tone="alert" />
-                  <Chip label={`Language: ${patientBundle.patient.primaryLanguage ?? 'N/A'}`} />
-                  <Chip label={`Setting: ${patientBundle.episodes[0]?.careSetting ?? 'home'}`} tone="warm" />
-                </div>
-              </div>
-
-              <div className="card">
-                <h3>Symptoms & Function</h3>
-                <ul className="mini-list">
-                  {patientBundle.symptomLogs.slice(-3).reverse().map((s) => (
-                    <li key={s.id}>
-                      {new Date(s.timestamp).toLocaleDateString()} · Pain {s.pain ?? '-'} / Dyspnea {s.dyspnea ?? '-'}{' '}
-                      <span className="muted">({s.reportedBy})</span>
-                    </li>
-                  ))}
-                  {patientBundle.functionalStatuses[0] && (
-                    <li>
-                      Latest function: {patientBundle.functionalStatuses[0].adlStatus} · {patientBundle.functionalStatuses[0].mobility}
-                    </li>
-                  )}
-                </ul>
-              </div>
-
-              <div className="card">
-                <h3>Medications</h3>
-                <ul className="mini-list two-col">
-                  {patientBundle.medications.map((m) => (
-                    <li key={m.id}>
-                      <strong>{m.name}</strong> {m.strength} {m.route} · {m.schedule}
-                      <p className="muted">{m.indication}</p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="card">
-                <h3>Upcoming & Tasks</h3>
-                <ul className="mini-list">
-                  {patientBundle.encounters.slice(0, 3).map((v) => (
-                    <li key={v.id}>
-                      <Chip label={v.type} tone="warm" /> {new Date(v.startTime).toLocaleString()} · {v.discipline}
-                    </li>
-                  ))}
-                  {patientBundle.tasks.slice(0, 3).map((t) => (
-                    <li key={t.id}>
-                      <Chip label={t.priority} tone={t.priority === 'urgent' ? 'alert' : 'warm'} /> {t.title}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            <div className="card">
+              <span className="step-number">2</span>
+              <h3>Connect your care team</h3>
+              <p className="muted">Patients, providers, and coordinators share the same up-to-date view.</p>
             </div>
-          )}
-        </section>
-
-        <section className="panel">
-          <header className="panel-header">
-            <div>
-              <p className="eyebrow">Intake & triage</p>
-              <h2>Referrals queue</h2>
+            <div className="card">
+              <span className="step-number">3</span>
+              <h3>Coordinate in one place</h3>
+              <p className="muted">Scheduling, messaging, and care plan highlights with gentle reminders.</p>
             </div>
-            <Chip label="Rules: urgent if pain >=8 or dyspnea >=7" tone="warm" />
-          </header>
-          <div className="list small">
-            {intake.map((r) => (
-              <div key={r.id} className="list-row static">
-                <div>
-                  <strong>{r.patientName}</strong> · {r.primaryDiagnosis}
-                  <p className="muted">{r.reason}</p>
-                </div>
-                <div className="row-chips">
-                  <Chip label={r.urgency} tone={r.urgency.toLowerCase().includes('same') ? 'alert' : 'warm'} />
-                  <Chip label={r.status} />
-                  <Chip label={new Date(r.createdAt).toLocaleDateString()} />
-                </div>
-              </div>
-            ))}
           </div>
         </section>
 
-        <section className="panel">
-          <header className="panel-header">
-            <div>
-              <p className="eyebrow">Scheduling</p>
-              <h2>Visits board</h2>
-            </div>
-            <Chip label="RN / MD / SW / CH" />
-          </header>
-          <div className="list small">
-            {schedule.map((v) => (
-              <div key={v.id} className="list-row static">
-                <div>
-                  <strong>{v.patientName}</strong> · {v.type}
-                  <p className="muted">{v.notes ?? v.location}</p>
-                </div>
-                <div className="row-chips">
-                  <Chip label={new Date(v.startTime).toLocaleString()} />
-                  <Chip label={v.team ?? 'Unassigned'} tone="warm" />
-                </div>
-              </div>
-            ))}
+        <section id="patients" className="section role-grid">
+          <div className="role-card">
+            <p className="eyebrow">For patients & families</p>
+            <h3>Stay oriented and heard</h3>
+            <p className="muted">
+              See your plan, your care team, and what to expect next. Keep your story, preferences, and goals visible to everyone.
+            </p>
+            <ul>
+              <li>Know who to call and when.</li>
+              <li>Get reminders for visits and medications.</li>
+              <li>Securely message your team for non-urgent questions.</li>
+            </ul>
+            <button className="primary" onClick={() => setMode('signup')}>
+              Sign Up as Patient
+            </button>
+          </div>
+          <div id="providers" className="role-card">
+            <p className="eyebrow">For care providers</p>
+            <h3>Arrive prepared, collaborate faster</h3>
+            <p className="muted">Unified patient view with symptoms, function, and tasks at a glance.</p>
+            <ul>
+              <li>See your patient panel in one place.</li>
+              <li>Prep for visits faster with current data.</li>
+              <li>Collaborate with nurses, social workers, chaplains, and coordinators.</li>
+            </ul>
+            <button className="secondary" onClick={() => setMode('signup')}>
+              Sign Up as Care Provider
+            </button>
+          </div>
+          <div id="coordinators" className="role-card">
+            <p className="eyebrow">For coordinators</p>
+            <h3>Keep schedules and referrals on track</h3>
+            <p className="muted">Centralize intake, assign visits, and reduce missed appointments.</p>
+            <ul>
+              <li>Manage referrals and intake in one queue.</li>
+              <li>Balance caseloads across teams.</li>
+              <li>Track who is assigned and when they’re visiting.</li>
+            </ul>
+            <button className="secondary" onClick={() => setMode('signup')}>
+              Sign Up as Coordinator
+            </button>
           </div>
         </section>
 
-        <section className="panel">
-          <header className="panel-header">
-            <div>
-              <p className="eyebrow">Inbox & tasks</p>
-              <h2>Team workload</h2>
-            </div>
-            <Chip label={`${tasks.length} items`} />
-          </header>
-          <div className="list small">
-            {tasks.map((t) => (
-              <div key={t.id} className="list-row static">
-                <div>
-                  <strong>{t.title}</strong> · {t.category}
-                  <p className="muted">{t.description}</p>
-                </div>
-                <div className="row-chips">
-                  <Chip label={t.priority} tone={t.priority === 'urgent' ? 'alert' : 'warm'} />
-                  <Chip label={t.status} />
-                </div>
+        <section className="section" id="features">
+          <div className="section-header">
+            <p className="eyebrow">Platform features</p>
+            <h2>Built for compassionate, coordinated care</h2>
+          </div>
+          <div className="feature-grid">
+            {[
+              { title: 'Patient 360° View', desc: 'Care plans, symptoms, function, and contacts in one place.' },
+              { title: 'Secure Messaging', desc: 'Non-urgent communication that keeps everyone aligned.' },
+              { title: 'Visit Scheduling', desc: 'Home and telehealth visits with role-based assignments.' },
+              { title: 'Care Plan Summaries', desc: 'Goals of care and preferences up front, not buried.' },
+              { title: 'Alerts & Reminders', desc: 'Gentle cues for urgent symptoms and upcoming visits.' },
+              { title: 'Analytics (Coming Soon)', desc: 'Census, ED visits, time-to-first-visit, and quality metrics.' }
+            ].map((f) => (
+              <div key={f.title} className="card feature-card">
+                <h3>{f.title}</h3>
+                <p className="muted">{f.desc}</p>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="panel">
-          <header className="panel-header">
-            <div>
-              <p className="eyebrow">Rounds</p>
-              <h2>Interdisciplinary board</h2>
+        <section id="security" className="section security">
+          <div>
+            <p className="eyebrow">Security & compliance</p>
+            <h2>Designed with privacy and trust in mind</h2>
+            <p className="muted">
+              Role-based access, encryption in transit and at rest (with proper deployment), and audit-ready logging paths for future hardening.
+            </p>
+            <div className="badges">
+              <span>Role-Based Access</span>
+              <span>Encryption in Transit</span>
+              <span>Audit Trails</span>
             </div>
-            <Chip label="Weekly IDT" />
-          </header>
-          <div className="table">
-            <div className="table-head">
-              <span>Name</span>
-              <span>Diagnosis</span>
-              <span>Risk</span>
-              <span>Signal</span>
-              <span>Disposition</span>
-            </div>
-            {rounds.map((r) => (
-              <div key={r.id} className="table-row">
-                <span>{r.name}</span>
-                <span>{r.diagnosis}</span>
-                <span>
-                  <Chip label={r.riskScore >= 8 ? 'High' : 'Moderate'} tone={r.riskScore >= 8 ? 'alert' : 'warm'} />
-                </span>
-                <span>
-                  <div className="sparkline">
-                    {r.sparkline.map((v: number, idx: number) => (
-                      <span key={idx} style={{ height: `${v * 5}px` }} />
-                    ))}
-                  </div>
-                </span>
-                <span className="muted">{r.disposition}</span>
-              </div>
-            ))}
+          </div>
+          <div className="card security-card">
+            <h3>We’re not an emergency service</h3>
+            <p className="muted">For emergencies, call 911 or your local emergency number.</p>
+            <p className="muted">SerenityCare 360 is built for coordinated, non-urgent palliative care.</p>
           </div>
         </section>
 
-        <section className="panel">
-          <header className="panel-header">
-            <div>
-              <p className="eyebrow">Program analytics</p>
-              <h2>Quality & ops</h2>
-            </div>
-            <Chip label="Admin view" />
-          </header>
-          {analytics && (
-            <div className="analytics">
-              <div className="stat">
-                <div>
-                  <p className="stat-label">Census</p>
-                  <p className="stat-number">{analytics.census}</p>
-                </div>
-                <div>
-                  <p className="stat-label">Severe symptoms</p>
-                  <p className="stat-number">{analytics.symptomsSevere}</p>
-                </div>
-                <div>
-                  <p className="stat-label">Open intake</p>
-                  <p className="stat-number">{analytics.intakeAging}</p>
-                </div>
-              </div>
-              <div className="muted">Risk distribution: High {analytics.riskBuckets.high} · Medium {analytics.riskBuckets.medium} · Low {analytics.riskBuckets.low}</div>
-            </div>
-          )}
+        <section className="section testimonials">
+          <div className="section-header">
+            <p className="eyebrow">Voices</p>
+            <h2>Placeholder words from people we serve</h2>
+          </div>
+          <div className="testimonial-grid">
+            <blockquote>
+              “I finally know who’s coming and when. It’s calmer at home.” <span>— Sample Patient</span>
+            </blockquote>
+            <blockquote>
+              “My visits start with the full picture, not a guessing game.” <span>— Sample Nurse</span>
+            </blockquote>
+            <blockquote>
+              “Referrals and schedules aren’t stuck in spreadsheets anymore.” <span>— Sample Coordinator</span>
+            </blockquote>
+          </div>
         </section>
 
-        <section className="panel">
-          <header className="panel-header">
-            <div>
-              <p className="eyebrow">Patient / caregiver portal</p>
-              <h2>What patients see</h2>
-            </div>
-            <Chip label="Mobile friendly" tone="ok" />
-          </header>
-          {portal ? (
-            <div className="portal">
-              <div>
-                <h3>Next visits</h3>
-                <ul className="mini-list">
-                  {portal.nextVisits.map((v: any) => (
-                    <li key={v.id}>
-                      <Chip label={v.type} tone="warm" /> {new Date(v.startTime).toLocaleString()}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h3>Care plan</h3>
-                <p className="muted">{portal.carePlan}</p>
-                <h4>Medications</h4>
-                <ul className="mini-list two-col">
-                  {portal.medications.map((m: any) => (
-                    <li key={m.id}>
-                      {m.name} {m.strength} · {m.schedule}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h3>Education</h3>
-                <ul className="mini-list">
-                  {portal.education.map((e: string, idx: number) => (
-                    <li key={idx}>{e}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          ) : (
-            <p className="muted">Loading portal...</p>
-          )}
+        <section className="section final-cta" id="contact">
+          <div>
+            <h2>Ready to bring your palliative care team together?</h2>
+            <p className="muted">Create your account and choose your role to get started.</p>
+          </div>
+          <div className="hero-actions">
+            <button className="primary" onClick={() => setMode('signup')}>
+              Sign Up as Patient
+            </button>
+            <button className="secondary" onClick={() => setMode('signup')}>
+              Sign Up as Care Provider
+            </button>
+            <button className="secondary" onClick={() => setMode('signup')}>
+              Sign Up as Coordinator
+            </button>
+          </div>
         </section>
       </main>
+
+      <footer className="footer">
+        <div>© {new Date().getFullYear()} SerenityCare 360</div>
+        <div className="footer-links">
+          <a href="#home">Home</a>
+          <a href="#security">Privacy</a>
+          <a href="#contact">Contact</a>
+        </div>
+        <div className="muted small">If this is an emergency, call 911 or your local emergency number.</div>
+      </footer>
+
+      {mode === 'signup' && (
+        <div className="modal">
+          <div className="modal-card">
+            <div className="modal-head">
+              <h3>Create your account</h3>
+              <p className="muted">Choose your role to tailor your dashboard.</p>
+            </div>
+            <div className="pill-row">
+              {(['PATIENT', 'CARE_PROVIDER', 'COORDINATOR'] as Role[]).map((r) => (
+                <RolePill key={r} role={r} selected={role === r} onClick={() => setRole(r)} />
+              ))}
+            </div>
+            <form onSubmit={handleSignup} className="form">
+              <label>
+                Full name
+                <input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+              </label>
+              <label>
+                Email
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              </label>
+              <label>
+                Password
+                <input type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required />
+              </label>
+              <label>
+                Confirm password
+                <input type="password" minLength={8} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+              </label>
+              {error && <div className="error">{error}</div>}
+              <button className="primary block" type="submit" disabled={loading}>
+                {loading ? 'Creating your account...' : 'Create account'}
+              </button>
+              <p className="muted link" onClick={() => setMode('login')}>
+                Already have an account? Log in
+              </p>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {mode === 'login' && (
+        <div className="modal">
+          <div className="modal-card">
+            <div className="modal-head">
+              <h3>Log in</h3>
+              <p className="muted">Welcome back to SerenityCare 360.</p>
+            </div>
+            <form onSubmit={handleLogin} className="form">
+              <label>
+                Email
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              </label>
+              <label>
+                Password
+                <input type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required />
+              </label>
+              {error && <div className="error">{error}</div>}
+              <button className="primary block" type="submit" disabled={loading}>
+                {loading ? 'Signing in…' : 'Log in'}
+              </button>
+              <p className="muted">Forgot password? (Coming soon)</p>
+              <p className="muted link" onClick={() => setMode('signup')}>
+                Need an account? Sign up
+              </p>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {mode === 'dashboard' && auth && (
+        <div className="drawer">
+          <div className="drawer-card">
+            <div className="drawer-head">
+              <h3>{dashboardCard?.title}</h3>
+              <button className="ghost" onClick={logout}>
+                Log out
+              </button>
+            </div>
+            <ul className="mini-list">
+              {dashboardCard?.lines.map((line, idx) => (
+                <li key={idx}>{line}</li>
+              ))}
+            </ul>
+            <p className="muted">Dashboard paths: /dashboard/patient, /dashboard/provider, /dashboard/coordinator (conceptual).</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

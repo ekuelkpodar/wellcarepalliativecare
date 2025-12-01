@@ -6,7 +6,8 @@ export type Role =
   | 'SOCIAL_WORKER'
   | 'CHAPLAIN'
   | 'COORDINATOR'
-  | 'ADMIN';
+  | 'ADMIN'
+  | 'CARE_PROVIDER';
 
 export interface User {
   id: string;

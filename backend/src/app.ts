@@ -7,6 +7,7 @@ import scheduleRouter from './routes/schedule';
 import analyticsRouter from './routes/analytics';
 import portalRouter from './routes/portal';
 import roundsRouter from './routes/rounds';
+import authRouter from './routes/auth';
 import { mockAuth } from './middleware/auth';
 
 const app = express();
@@ -15,6 +16,7 @@ app.use(express.json());
 app.use(mockAuth);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+app.use('/api/auth', authRouter);
 app.use('/api/patients', patientsRouter);
 app.use('/api/tasks', tasksRouter);
 app.use('/api/intake', intakeRouter);

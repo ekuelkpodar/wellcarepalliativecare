@@ -1,17 +1,18 @@
-# Palliative Care 360° Platform
+# SerenityCare 360
 
-Full-stack demo for a unified palliative care operating system: Patient 360, intake/triage, scheduling, IDT rounds, tasks/inbox, analytics, and a patient/caregiver portal.
+Unified palliative care platform demo with a production-style landing page, Postgres-backed auth (patients, care providers, coordinators), and seeded clinical/workflow APIs.
 
 ## Stack
-- Backend: Node.js + TypeScript + Express with in-memory seeded data (no DB required for the demo). Jest + Supertest for API smoke tests.
-- Frontend: React + Vite + TypeScript, responsive dark UI.
+- Backend: Node.js + TypeScript + Express; Postgres for auth users; in-memory demo data for clinical entities; Jest + Supertest for API smoke tests.
+- Frontend: React + Vite + TypeScript; responsive healthcare-style marketing + auth flows.
 
 ## Quick start
 ```bash
 # Backend
 cd backend
 npm install
-npm run dev        # http://localhost:4000
+cp .env.example .env         # update DATABASE_URL & JWT_SECRET
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/serenitycare npm run dev
 # optional: npm test
 
 # Frontend
@@ -20,46 +21,30 @@ npm install
 VITE_API_URL=http://localhost:4000 npm run dev   # http://localhost:5173
 ```
 
-## Feature map
-- **Patient 360°**: demographics, goals, meds, vitals, symptoms, function, encounters, tasks, equipment, documents, care team.
-- **Intake & triage**: referral queue, urgency/status, assign to teams.
-- **Scheduling**: visit board by patient/discipline with location hints.
-- **Inbox & tasks**: filterable tasks with priority/status.
-- **Rounds board**: IDT-ready list with risk, sparkline of symptom trend, disposition notes.
-- **Analytics**: census, severe symptoms count, intake load, risk distribution.
-- **Portal view**: next visits, simplified care plan, meds, education; mobile-friendly styling.
-- **Assistive AI-ish rules**: simple triage helper (pain/dyspnea to urgent/priority/routine), composite risk scoring combining symptoms, function, and utilization.
+## Auth / database
+- Postgres users table created automatically on server start (requires `DATABASE_URL`).
+- Endpoint summary:
+  - `POST /api/auth/signup` — fullName, email, password, confirmPassword, role (`PATIENT` | `CARE_PROVIDER` | `COORDINATOR`).
+  - `POST /api/auth/login`
+  - `GET /api/auth/me` (Bearer token)
+- Roles drive post-login dashboard messaging and future gating.
 
-## Security / RBAC (conceptual)
-- Mock auth via headers: `x-user-role` and optional `x-user-id`. Role checks gate task creation and intake actions.
-- Patients/caregivers are scoped to their own patient record for list/detail routes.
-- Logs and PHI markers noted in code comments to harden later (add real auth, audit logging, encryption, etc.).
+## Marketing landing page
+- Nav anchors, hero with role CTAs, “How it works”, role-specific panels, feature grid, security/compliance, testimonials, final CTA, footer + emergency disclaimer.
+- Calm healthcare theme (soft blues/teal, high-contrast text), responsive for desktop/tablet/mobile.
 
-## Data model (seeded in-memory)
-- Core entities: Patient, CareEpisode, Encounter, SymptomLog, FunctionalStatus, Medication, Vital, Task, Communication, Document, EquipmentOrder, TransportationEvent, Utilization, IntakeReferral, CareTeamMember, InterdisciplinaryTeam, Organization, User.
-- 10 sample patients with varied diagnoses/states, multi-discipline teams, encounters, symptoms, tasks, intake referrals, equipment, transport, and utilization events.
+## Clinical demo API (existing)
+- Patient 360 bundle, intake queue, schedule board, tasks/inbox, rounds board, analytics, portal payload (non-authenticated demo endpoints using mock headers).
+- Key routes: `/api/patients`, `/api/patients/:id`, `/api/patients/:id/symptoms`, `/api/tasks`, `/api/intake`, `/api/schedule`, `/api/rounds`, `/api/analytics`, `/api/portal/:patientId`.
 
-## API (samples)
-- `GET /api/patients` — list with risk flags and open task counts.
-- `GET /api/patients/:id` — full patient bundle.
-- `POST /api/patients/:id/symptoms` — add symptom log + triage suggestion.
-- `GET /api/tasks` / `POST /api/tasks` — task views and creation (role-gated).
-- `GET /api/intake` / `POST /api/intake/:id/assign` — intake queue + assignment.
-- `GET /api/schedule` — visit board.
-- `GET /api/rounds` — IDT board.
-- `GET /api/analytics` — quality/ops metrics.
-- `GET /api/portal/:patientId` — patient/caregiver portal payload.
-
-## Frontend highlights
-- Bold, dark UI with chips/sparklines and responsive grid.
-- Landing hero with “My Work Today” (urgent tasks + visits).
-- Patient list + Patient 360 panel; cards for symptoms/function/meds/tasks.
-- Dedicated panels: Intake queue, Scheduling board, Inbox/Tasks, Rounds, Analytics, Portal preview.
+## Frontend flows
+- Signup/login modals with role selection; JWT stored locally; lightweight role dashboards (patient/provider/coordinator) to differentiate experiences.
+- Landing page sections map to scroll anchors for marketing nav.
 
 ## Tests
-- Backend: `npm test` runs Jest + Supertest smoke tests for core patient endpoints and symptom triage.
+- Backend: `npm test` (Jest + Supertest) covers patient endpoints and symptom triage.
 
-## Next steps
-- Swap in a real DB (Postgres) with Prisma migrations; add auth provider + audit logging.
-- Add write endpoints for encounters/tasks/status changes and websocket notifications.
-- Expand analytics (time-to-first-visit, ED/hospital trends pre/post enrollment, workload by discipline).
+## Notes / next steps
+- Harden auth routes (rate limits, email verification, password reset).
+- Add real RBAC to clinical endpoints and replace in-memory data with Postgres models/migrations.
+- Deploy with SSL-enabled Postgres and production-grade JWT secret management.
