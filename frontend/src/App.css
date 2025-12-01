@@ -390,3 +390,29 @@ input {
     position: static;
   }
 }
+
+.dashboard {
+  margin-top: 16px;
+}
+
+.dash-hero {
+  border-left: 4px solid var(--accent);
+  background: #e0f2fe;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.stat-card h4 {
+  margin: 0 0 6px;
+}
+
+.dash-footnote {
+  margin-top: 12px;
+}

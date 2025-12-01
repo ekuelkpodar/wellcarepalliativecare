@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { api, type Role } from './api';
 import './App.css';
 
@@ -92,44 +92,8 @@ function App() {
     setMode('landing');
   };
 
-  const dashboardCard = useMemo(() => {
-    if (!auth) return null;
-    const greeting = `Welcome, ${auth.user.fullName}`;
-    if (auth.user.role === 'PATIENT') {
-      return { title: greeting, lines: ['Upcoming visits and reminders will appear here.', 'Meet your care team and keep your goals visible.'] };
-    }
-    if (auth.user.role === 'CARE_PROVIDER') {
-      return {
-        title: greeting,
-        lines: ['View your patient panel in one place.', 'Prep for visits with symptom, function, and task snapshots.']
-      };
-    }
-    return { title: greeting, lines: ['Track referrals and assign visits.', 'Balance caseloads and reduce missed appointments.'] };
-  }, [auth]);
-
-  return (
-    <div className="page">
-      <header className="nav">
-        <div className="logo">SerenityCare 360</div>
-        <nav>
-          <a href="#home">Home</a>
-          <a href="#how">How It Works</a>
-          <a href="#patients">For Patients</a>
-          <a href="#providers">For Providers</a>
-          <a href="#coordinators">For Coordinators</a>
-          <a href="#security">Security</a>
-          <a href="#contact">Contact</a>
-        </nav>
-        <div className="nav-actions">
-          <button className="ghost" onClick={() => setMode('login')}>
-            Log In
-          </button>
-          <button className="primary" onClick={() => setMode('signup')}>
-            Get Started
-          </button>
-        </div>
-      </header>
-
+  const renderLanding = () => (
+    <>
       <main>
         <section id="home" className="hero">
           <div>
@@ -324,6 +288,158 @@ function App() {
         </div>
         <div className="muted small">If this is an emergency, call 911 or your local emergency number.</div>
       </footer>
+    </>
+  );
+
+  const renderDashboardContent = () => {
+    if (!auth) return null;
+    if (auth.user.role === 'PATIENT') {
+      return (
+        <>
+          <div className="dash-hero" style={{ borderColor: roleCopy.PATIENT.accent }}>
+            <p className="eyebrow">Patient home</p>
+            <h2>Hello {auth.user.fullName}</h2>
+            <p className="muted">Your care plan, reminders, and team are all here.</p>
+          </div>
+          <div className="dash-grid">
+            <div className="card stat-card">
+              <h4>Upcoming visits</h4>
+              <ul className="mini-list">
+                <li>RN home visit · Tomorrow 10:00 AM</li>
+                <li>Telehealth with provider · Fri 2:00 PM</li>
+              </ul>
+            </div>
+            <div className="card stat-card">
+              <h4>Care plan highlights</h4>
+              <ul className="mini-list">
+                <li>Goal: Stay comfortable at home, avoid ED if possible.</li>
+                <li>Preferences: Quiet mornings, prefers phone updates.</li>
+              </ul>
+            </div>
+            <div className="card stat-card">
+              <h4>Your care team</h4>
+              <ul className="mini-list">
+                <li>Nurse Riley · riley@wellcare.com</li>
+                <li>Dr. Stone · stone@wellcare.com</li>
+                <li>Coordinator Kay · kay@wellcare.com</li>
+              </ul>
+            </div>
+          </div>
+        </>
+      );
+    }
+    if (auth.user.role === 'CARE_PROVIDER') {
+      return (
+        <>
+          <div className="dash-hero" style={{ borderColor: roleCopy.CARE_PROVIDER.accent }}>
+            <p className="eyebrow">Provider home</p>
+            <h2>Welcome back, {auth.user.fullName}</h2>
+            <p className="muted">Your panel, today’s visits, and alerts in one place.</p>
+          </div>
+          <div className="dash-grid">
+            <div className="card stat-card">
+              <h4>Today’s visits</h4>
+              <ul className="mini-list">
+                <li>Eleanor Brooks · Home visit · 10:00 AM</li>
+                <li>Robert Chen · Telehealth · 1:00 PM</li>
+              </ul>
+            </div>
+            <div className="card stat-card">
+              <h4>Patient panel (snapshot)</h4>
+              <ul className="mini-list">
+                <li>High priority: 2 patients with pain ≥7</li>
+                <li>Risk alerts: ED risk flagged on 3 patients</li>
+              </ul>
+            </div>
+            <div className="card stat-card">
+              <h4>Tasks & follow-ups</h4>
+              <ul className="mini-list">
+                <li>Call palliative RN about diuretic titration</li>
+                <li>Review POLST for Linda Garcia</li>
+              </ul>
+            </div>
+          </div>
+        </>
+      );
+    }
+    return (
+      <>
+        <div className="dash-hero" style={{ borderColor: roleCopy.COORDINATOR.accent }}>
+          <p className="eyebrow">Coordinator home</p>
+          <h2>Hi {auth.user.fullName}</h2>
+          <p className="muted">Referrals, schedules, and assignments at a glance.</p>
+        </div>
+        <div className="dash-grid">
+          <div className="card stat-card">
+            <h4>Referral queue</h4>
+            <ul className="mini-list">
+              <li>Julia Perez · CHF · Urgency: 24-48h</li>
+              <li>Sean Murphy · Dementia · Urgency: Routine</li>
+            </ul>
+          </div>
+          <div className="card stat-card">
+            <h4>Schedule highlights</h4>
+            <ul className="mini-list">
+              <li>RN coverage needed · Thursday AM</li>
+              <li>Telehealth slots · Friday PM</li>
+            </ul>
+          </div>
+          <div className="card stat-card">
+            <h4>Assignments</h4>
+            <ul className="mini-list">
+              <li>Assign chaplain for Linda Garcia (hospice transition)</li>
+              <li>Confirm transport for Noah Patel dialysis ride</li>
+            </ul>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  const renderDashboard = () => (
+    <main className="dashboard">
+      {renderDashboardContent()}
+      <div className="muted small dash-footnote">This is a role-based placeholder dashboard; extend with live data next.</div>
+    </main>
+  );
+
+  return (
+    <div className="page">
+      <header className="nav">
+        <div className="logo">SerenityCare 360</div>
+        {!auth && (
+          <nav>
+            <a href="#home">Home</a>
+            <a href="#how">How It Works</a>
+            <a href="#patients">For Patients</a>
+            <a href="#providers">For Providers</a>
+            <a href="#coordinators">For Coordinators</a>
+            <a href="#security">Security</a>
+            <a href="#contact">Contact</a>
+          </nav>
+        )}
+        <div className="nav-actions">
+          {auth ? (
+            <>
+              <span className="chip" style={{ borderColor: roleCopy[auth.user.role].accent }}>{roleCopy[auth.user.role].title}</span>
+              <button className="ghost" onClick={logout}>
+                Log Out
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="ghost" onClick={() => setMode('login')}>
+                Log In
+              </button>
+              <button className="primary" onClick={() => setMode('signup')}>
+                Get Started
+              </button>
+            </>
+          )}
+        </div>
+      </header>
+
+      {auth && mode === 'dashboard' ? renderDashboard() : renderLanding()}
 
       {mode === 'signup' && (
         <div className="modal">
@@ -395,24 +511,6 @@ function App() {
         </div>
       )}
 
-      {mode === 'dashboard' && auth && (
-        <div className="drawer">
-          <div className="drawer-card">
-            <div className="drawer-head">
-              <h3>{dashboardCard?.title}</h3>
-              <button className="ghost" onClick={logout}>
-                Log out
-              </button>
-            </div>
-            <ul className="mini-list">
-              {dashboardCard?.lines.map((line, idx) => (
-                <li key={idx}>{line}</li>
-              ))}
-            </ul>
-            <p className="muted">Dashboard paths: /dashboard/patient, /dashboard/provider, /dashboard/coordinator (conceptual).</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
