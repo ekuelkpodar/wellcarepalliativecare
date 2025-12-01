@@ -1,0 +1,12 @@
+node_modules
+dist
+frontend/node_modules
+frontend/dist
+backend/node_modules
+backend/dist
+.env
+*.log
+.DS_Store
+pnpm-lock.yaml
+yarn.lock
+backend/prisma/dev.db

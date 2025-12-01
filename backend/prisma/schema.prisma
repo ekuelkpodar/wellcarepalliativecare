@@ -1,0 +1,270 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      String   // PATIENT, CAREGIVER, NURSE, PHYSICIAN, SOCIAL_WORKER, CHAPLAIN, COORDINATOR, ADMIN
+  password  String
+  patients  Patient[] @relation("PatientUser")
+}
+
+model Organization {
+  id      String  @id @default(cuid())
+  name    String
+  type    String
+  region  String
+  contact String?
+  teams   InterdisciplinaryTeam[]
+}
+
+model InterdisciplinaryTeam {
+  id             String            @id @default(cuid())
+  name           String
+  region         String
+  serviceLines   String
+  organization   Organization?     @relation(fields: [organizationId], references: [id])
+  organizationId String?
+  members        CareTeamMember[]
+  patients       CareEpisode[]
+}
+
+model CareTeamMember {
+  id          String   @id @default(cuid())
+  name        String
+  role        String   // RN, MD, SW, CH, etc.
+  disciplines String   // comma separated for SQLite demo
+  contact     String?
+  team        InterdisciplinaryTeam? @relation(fields: [teamId], references: [id])
+  teamId      String?
+}
+
+model Patient {
+  id                    String     @id @default(cuid())
+  name                  String
+  dob                   DateTime
+  gender                String?
+  primaryLanguage       String?
+  address               String?
+  contactInfo           String?
+  emergencyContacts     String?
+  primaryDiagnosis      String
+  secondaryDiagnoses    String?
+  palliativeEligibility String?
+  codeStatus            String
+  carePreferences       String?
+  livingSituation       String?
+  primaryCaregiver      String?
+  goalsOfCare           String?
+  spiritualPreferences  String?
+  riskOfED              Int        @default(0)
+  riskOfHospitalization Int        @default(0)
+  episodes              CareEpisode[]
+  encounters            Encounter[]
+  medications           Medication[]
+  vitals                Vital[]
+  symptomLogs           SymptomLog[]
+  functionalStatuses    FunctionalStatus[]
+  tasks                 Task[]
+  communications        Communication[]
+  documents             Document[]
+  equipmentOrders       EquipmentOrder[]
+  transportationEvents  TransportationEvent[]
+  utilizations          Utilization[]
+  portalUsers           User[]     @relation("PatientUser")
+}
+
+model CareEpisode {
+  id                  String                 @id @default(cuid())
+  patient             Patient                @relation(fields: [patientId], references: [id])
+  patientId           String
+  startDate           DateTime
+  endDate             DateTime?
+  referralSource      String
+  careSetting         String
+  attendingProviderId String?
+  team                InterdisciplinaryTeam? @relation(fields: [teamId], references: [id])
+  teamId              String?
+  status              String
+  encounters          Encounter[]
+  tasks               Task[]
+}
+
+model IntakeReferral {
+  id                String   @id @default(cuid())
+  patientName       String
+  dob               DateTime?
+  primaryDiagnosis  String
+  referringProvider String?
+  reason            String
+  urgency           String
+  symptomBurden     String?
+  functionalStatus  String?
+  codeStatus        String?
+  createdAt         DateTime @default(now())
+  assignedTeam      String?
+  status            String   @default("new")
+}
+
+model Encounter {
+  id                   String      @id @default(cuid())
+  patient              Patient     @relation(fields: [patientId], references: [id])
+  patientId            String
+  episode              CareEpisode @relation(fields: [episodeId], references: [id])
+  episodeId            String
+  type                 String
+  discipline           String
+  startTime            DateTime
+  endTime              DateTime
+  location             String
+  notes                String
+  problems             String?
+  interventions        String?
+  followUpPlan         String?
+  nextVisitRecommended DateTime?
+}
+
+model SymptomLog {
+  id           String   @id @default(cuid())
+  patient      Patient  @relation(fields: [patientId], references: [id])
+  patientId    String
+  timestamp    DateTime
+  reportedBy   String
+  pain         Int?
+  dyspnea      Int?
+  nausea       Int?
+  anxiety      Int?
+  fatigue      Int?
+  appetite     Int?
+  sleepQuality Int?
+  notes        String?
+}
+
+model FunctionalStatus {
+  id         String   @id @default(cuid())
+  patient    Patient  @relation(fields: [patientId], references: [id])
+  patientId  String
+  timestamp  DateTime
+  adlStatus  String
+  mobility   String
+  performance String?
+  cognitive  String?
+}
+
+model Medication {
+  id                  String   @id @default(cuid())
+  patient             Patient  @relation(fields: [patientId], references: [id])
+  patientId           String
+  name                String
+  strength            String
+  route               String
+  schedule            String
+  indication          String
+  prescribingProviderId String?
+  startDate           DateTime
+  endDate             DateTime?
+  active              Boolean  @default(true)
+  notes               String?
+}
+
+model Vital {
+  id               String   @id @default(cuid())
+  patient          Patient  @relation(fields: [patientId], references: [id])
+  patientId        String
+  timestamp        DateTime
+  heartRate        Int?
+  systolic         Int?
+  diastolic        Int?
+  respiratoryRate  Int?
+  oxygenSaturation Int?
+  temperature      Float?
+  weight           Float?
+  notes            String?
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  patient     Patient?     @relation(fields: [patientId], references: [id])
+  patientId   String?
+  episode     CareEpisode? @relation(fields: [episodeId], references: [id])
+  episodeId   String?
+  assignedTo  String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  dueAt       DateTime?
+  completedAt DateTime?
+  category    String
+  title       String
+  description String?
+  status      String
+  priority    String
+}
+
+model Communication {
+  id             String   @id @default(cuid())
+  patient        Patient  @relation(fields: [patientId], references: [id])
+  patientId      String
+  direction      String
+  channel        String
+  contentSummary String
+  fullContent    String?
+  timestamp      DateTime
+  taggedAs       String?
+}
+
+model Document {
+  id           String   @id @default(cuid())
+  patient      Patient  @relation(fields: [patientId], references: [id])
+  patientId    String
+  documentType String
+  uploadedBy   String
+  uploadedAt   DateTime @default(now())
+  storageUrl   String
+  status       String
+}
+
+model EquipmentOrder {
+  id           String   @id @default(cuid())
+  patient      Patient  @relation(fields: [patientId], references: [id])
+  patientId    String
+  type         String
+  status       String
+  vendor       String?
+  orderDate    DateTime
+  deliveryDate DateTime?
+  pickupDate   DateTime?
+  notes        String?
+}
+
+model TransportationEvent {
+  id          String   @id @default(cuid())
+  patient     Patient  @relation(fields: [patientId], references: [id])
+  patientId   String
+  type        String
+  origin      String
+  destination String
+  dateTime    DateTime
+  reason      String
+  arrangedBy  String?
+  vendor      String?
+  outcome     String?
+}
+
+model Utilization {
+  id         String   @id @default(cuid())
+  patient    Patient  @relation(fields: [patientId], references: [id])
+  patientId  String
+  facility   String
+  startTime  DateTime
+  endTime    DateTime?
+  reason     String
+  outcome    String?
+  avoidable  Boolean  @default(false)
+}
